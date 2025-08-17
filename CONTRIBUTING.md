@@ -1,17 +1,56 @@
-## Branch naming
-Branch names should indicate type of work. For fixes also related issue should be mentioned.
-The format is `fix/123-short-description`, `feature/description` or `feature/123-short-description`.
+## Convención para Nombres de Ramas
+Los nombres de ramas deben indicar el tipo de trabajo siguiendo este formato:
 
-For example
-* [PR 648](https://github.com/colouring-cities/colouring-core/pull/684) used branch `fix/681-land-use-edit` referencing [#681](https://github.com/colouring-cities/colouring-core/issues/681)
-* [PR 625](https://github.com/colouring-cities/colouring-core/pull/625) used branch `feature/verification`
+- `fix/123-descripcion-corta` - Para correcciones de errores (incluir número de issue)
+- `feature/descripcion` - Para nuevas funcionalidades
+- `feature/123-descripcion-corta` - Para funcionalidades relacionadas con issues
+- `docs/actualizar-readme` - Para cambios en documentación
+- `data/agregar-edificios-monteria` - Para actualizaciones de datos
 
-## Commits
-Commit messages should start from an upper case. So `Change public ownership sources field to array` is preferred over `change public ownership sources field to array`.
+Ejemplos:
+* `fix/45-tipos-edificios-faltantes` - Corrige el issue #45 sobre tipos de edificios
+* `feature/agregar-eficiencia-energetica` - Añade nueva funcionalidad de eficiencia energética
+* `data/actualizar-limites-monteria` - Actualiza datos de límites de Montería
 
-## 'Generifying' the Platform
-We are still in the process of moving from the Colouring Britain prototype to the Colouring Cities Core platform. If you notice any London-specific/Britain-specific text or variables in the Core code, we would be grateful if you could flag those up, either by raising an issue so that we can fix them or by fixing them yourself and creating a pull request. 
+## Mensajes de Commit
+- Comenzar con mayúscula
+- Usar tiempo presente ("Agrega" en lugar de "Agregó")
+- Ser conciso pero descriptivo
 
-Ideally, any references to London should be replaced, either:
-- with the City Name parameter (specified in [the technical manual](https://github.com/colouring-cities/ccrp-technical-manual/wiki/Configuring-the-Colouring-Cities-Core-Platform)) when referring to a specific deployment.
-- with "Colouring Cities" when referring to the wider CCRP.
+Correcto: "Actualiza configuración del mapa base de Montería"
+Evitar: "actualicé configuración del mapa"
+
+## Adaptación de la Plataforma para Montería
+Al adaptar la plataforma Colouring Cities Core para Montería:
+
+1. Reemplaza referencias específicas de Britain/Londres con:
+   - "Montería" para la implementación local
+   - "Colouring Cities" para la plataforma global
+
+2. Reporta elementos específicos de ubicación:
+   - Abriendo un issue con la etiqueta "localización"
+   - Enviando un pull request con las correcciones
+
+3. Para nuevas funcionalidades:
+   - Usa variables configurables en `cc-config.json`
+   - Evita codificar valores específicos de Montería
+   - Documenta nuevas opciones de configuración
+
+Archivos clave para personalizar:
+- `app/src/cc-config.json` - Configuración principal
+- `app/src/locales/en.json` - Textos de la interfaz
+- `app/map_styles/` - Estilos visuales del mapa
+
+## Guía para Contribuciones
+1. **Reporte de problemas**:
+   - Usa issues para reportar bugs o sugerir mejoras
+   - Incluye capturas de pantalla cuando sea relevante
+
+2. **Envío de cambios**:
+   - Haz fork del repositorio y crea una rama nueva
+   - Envía pull requests describiendo los cambios
+
+3. **Estándares de código**:
+   - Sigue la estructura existente del proyecto
+   - Comenta tu código cuando sea necesario
+   - Mantén consistencia en el estilo
