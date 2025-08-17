@@ -46,3 +46,32 @@ npm install
 
 # 4. Iniciar servidor
 npm run dev
+
+## 🧰 Requisitos Técnicos
+
+### Dependencias principales
+| Tecnología       | Versión  | Instalación Recomendada |
+|------------------|----------|-------------------------|
+| Node.js          | 16+      | [Descargar Node.js](https://nodejs.org/) |
+| PostgreSQL       | 13+      | `sudo apt install postgresql` |
+| PostGIS          | 3+       | `sudo apt install postgis` |
+
+### Dependencias opcionales
+| Herramienta      | Uso                     | Instalación              |
+|------------------|-------------------------|--------------------------|
+| Python 3.8+      | ETL de datos            | `sudo apt install python3` |
+| GDAL             | Procesamiento geoespacial | `sudo apt install gdal-bin` |
+| Docker           | Entorno contenerizado   | [Instalar Docker](https://docs.docker.com/engine/install/) |
+
+## 📜 Licencia y Atribución
+[![GPLv3 License](https://img.shields.io/badge/Licencia-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+Este proyecto utiliza la **GNU General Public License v3**, heredada del proyecto original Colouring Cities. Esta licencia garantiza:
+
+```mermaid
+graph LR
+    A[Libertad de uso] --> B[Puedes ejecutar el software]
+    A --> C[Puedes estudiarlo y modificarlo]
+    A --> D[Puedes redistribuir copias]
+    A --> E[Puedes mejorar el software]
+
