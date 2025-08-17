@@ -1,45 +1,48 @@
 # Colouring Montería Platform
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-Plataforma de mapeo colaborativo para el análisis de edificaciones en Montería, Colombia.
+Adaptación para Montería del proyecto Colouring Cities del Alan Turing Institute
 
-## 📍 Acerca del Proyecto
-¿Cuántos edificios existen en Montería? ¿Qué características tienen? ¿Cómo funcionan para sus usuarios y comunidades locales? 
+## 📚 Origen y Atribución
+Este proyecto es una adaptación oficial del código abierto [Colouring Cities](https://github.com/colouring-cities) desarrollado por [The Alan Turing Institute](https://www.turing.ac.uk/). Mantenemos la misma licencia GPL v3 y filosofía de datos abiertos.
 
-Colouring Montería es un **recurso público gratuito** que provee datos espaciales abiertos sobre las edificaciones de la ciudad. Desarrollado como adaptación del programa de investigación [Colouring Cities](http://colouringcities.org/), esta iniciativa busca:
+[![Repositorio Original](https://img.shields.io/badge/Fuente-Colouring_Cities-blue)](https://github.com/colouring-cities/colouring-core)
 
-- Mapear y caracterizar todas las edificaciones de Montería
-- Promover el desarrollo urbano sostenible
-- Generar datos abiertos para investigadores y tomadores de decisiones
-- Fomentar la participación ciudadana en el conocimiento urbano
+## 🌟 ¿Qué es Colouring Montería?
+Plataforma colaborativa para mapear y analizar edificaciones en Montería, Colombia. 
 
-## 🗺️ Datos del Proyecto
-- **Área de cobertura**: Área metropolitana de Montería
-- **Fuentes principales**: 
-  - OpenStreetMap
-  - Planes de ordenamiento territorial
-  - Datos abiertos municipales
-- **Variables mapeadas**:
-  - Edad y tipología de construcciones
-  - Uso del suelo
-  - Estado de conservación
-  - Infraestructura verde
+**Objetivos principales**:
+- 🏙️ Crear el primer catastro abierto de edificaciones de Montería
+- 📊 Generar datos para investigación urbana
+- 🌿 Promover desarrollo sostenible
+- 👥 Fomentar participación ciudadana
 
-## 🛠️ Configuración Técnica
+## 🗺️ Datos Principales
+| **Área**          | **Cobertura**       |
+|-------------------|---------------------|
+| Localización      | Montería, Colombia  |
+| Coordenadas       | 8.7489° N, 75.8814° W |
+| Fuentes oficiales | [Datos Abiertos Montería](https://www.monteria.gov.co/) |
 
-### Requisitos
-- Node.js 16+
-- PostgreSQL 13+
-- PostGIS 3+
+**Variables mapeadas**:
+- Edad y tipo de construcciones
+- Uso del suelo
+- Materiales de construcción
+- Eficiencia energética
+- Estado de conservación
 
-### Instalación
+## 🛠️ Instalación Rápida
+
 ```bash
-# Clonar repositorio
+# 1. Clonar repositorio
 git clone https://github.com/teheransmit/colouring-monteria.git
-cd colouring-monteria/app
 
-# Instalar dependencias
+# 2. Configurar entorno
+cd colouring-monteria/app
+cp .env.example .env  # Editar con tus credenciales
+
+# 3. Instalar dependencias
 npm install
 
-# Configurar variables de entorno (crear archivo .env)
-cp .env.example .env
+# 4. Iniciar servidor
+npm run dev
