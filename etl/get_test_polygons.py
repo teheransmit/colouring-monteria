@@ -19,7 +19,7 @@ osmnx.config(log_console=True, use_cache=True)
 size = 256
 
 # load buildings from about 1.5km² around UCL
-point = (51.524498, -0.133874)
+point = (8.7489, -75.8814)# Montería, Colombia
 dist = 612
 tags = {"building": True}
 gdf = osmnx.features_from_point(point, tags, dist=dist)
