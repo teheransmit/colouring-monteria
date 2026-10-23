@@ -1,0 +1,12 @@
+{
+  "12345": {
+    "attributes": {
+      "year_built": 1998,
+      "current_landuse": "Commercial"
+    },
+    "userAttributes": {
+      "user_notes": "Edificio comercial en el centro de Monteria"
+    },
+    "revisionId": "1792784391741"
+  }
+}

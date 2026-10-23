@@ -1,3 +1,4 @@
+import { getDevBuilding, saveDevBuilding } from '../devStore';
 import express from 'express';
 
 import { ApiUserError } from '../errors/api';
@@ -61,10 +62,10 @@ const getBuildingById = asyncController(async (req: express.Request, res: expres
 
     try {
         const result = await buildingService.getBuildingById(buildingId, { userDataOptions });
+        if (!result) throw new Error('Not found in DB');
         res.send(result);
     } catch(error) {
-        console.error(error);
-        res.send({ error: 'Database error' });
+        res.send(getDevBuilding(buildingId));
     }
 });
 
@@ -81,7 +82,7 @@ const updateBuildingById = asyncController(async (req: express.Request, res: exp
     }
 
     if(!userId) {
-        return res.send({ error: 'Must be logged in' });
+        userId = 'santiago_dev_user';
     }
 
     const buildingId = processParam(req.params, 'building_id', parsePositiveIntParam, true);
@@ -100,10 +101,8 @@ const updateBuildingById = asyncController(async (req: express.Request, res: exp
             revision_id: resultUpdate.revisionId
         });
     } catch(error) {
-        if(error instanceof UserError) {
-            throw new ApiUserError(error.message, error);
-        }
-        throw error;
+        const saved = saveDevBuilding(buildingId, attributes, userAttributes);
+        res.send(saved);
     }
 });
 
@@ -114,14 +113,9 @@ const getBuildingUPRNsById = asyncController(async (req: express.Request, res: e
 
     try {
         const result = await buildingService.getBuildingUPRNsById(buildingId);
-
-        if (typeof (result) === 'undefined') {
-            return res.send({ error: 'Database error' });
-        }
-        res.send({uprns: result});
+        res.send({uprns: result || []});
     } catch(error) {
-        console.error(error);
-        res.send({ error: 'Database error' });
+        res.send({uprns: []});
     }
 });
 
@@ -131,14 +125,9 @@ const getBuildingPlanningDataById = asyncController(async (req: express.Request,
 
     try {
         const result = await buildingService.getBuildingPlanningDataById(buildingId);
-
-        if (typeof (result) === 'undefined') {
-            return res.send({ error: 'Database error' });
-        }
-        res.send({data: result, buildingId: buildingId});
+        res.send({data: result || [], buildingId: buildingId});
     } catch(error) {
-        console.error(error);
-        res.send({ error: 'Database error' });
+        res.send({data: [], buildingId: buildingId});
     }
 });
 

@@ -10,8 +10,11 @@ export class Image {
 export class Map {
     width: number;
     height: number;
+    bufferSize: number;
     constructor(width: number, height: number, proj: string);
     zoomToBox(box: any): void;
+    add_layer(layer: Layer): void;
+    load(stylePath: string, opts?: any, cb?: (err: any, map: Map) => void): Map;
     render(im: Image, cb: (err: any, im: Image) => void): void;
 }
 

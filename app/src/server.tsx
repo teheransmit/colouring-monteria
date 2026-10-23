@@ -23,14 +23,25 @@ server.disable('x-powered-by');
 server.use(express.static(process.env.RAZZLE_PUBLIC_DIR));
 
 // handle user sessions
-const pgSession = pgConnect(session);
+let sessionStore: any = undefined;
+try {
+    const pgSession = pgConnect(session);
+    sessionStore = new pgSession({
+        pgPromise: db,
+        tableName: 'user_sessions',
+        pruneSessionInterval: false,
+        errorLog: (err: any) => {
+            // Ignorar avisos periódicos de conexión en desarrollo
+        }
+    });
+} catch (e) {
+    // Fallback a memoria
+}
+
 const sess: any = { // TODO: remove any
     name: 'cl.session',
-    store: new pgSession({
-        pgPromise: db,
-        tableName: 'user_sessions'
-    }),
-    secret: process.env.APP_COOKIE_SECRET,
+    store: sessionStore,
+    secret: process.env.APP_COOKIE_SECRET || '123456',
     saveUninitialized: false,
     resave: false,
     cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 days

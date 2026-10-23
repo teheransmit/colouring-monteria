@@ -27,10 +27,17 @@ class Image {
 
 class Map {
     constructor(w, h, proj) {
-        this.width = w;
-        this.height = h;
+        this.width = w || 256;
+        this.height = h || 256;
+        this.bufferSize = 0;
     }
     zoomToBox() {}
+    add_layer() {}
+    load(stylePath, opts, cb) {
+        if (typeof opts === 'function') cb = opts;
+        if (cb) cb(null, this);
+        return this;
+    }
     render(im, cb) {
         if (cb) cb(null, im);
     }
