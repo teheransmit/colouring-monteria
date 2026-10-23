@@ -229,3 +229,17 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
   6. Se estructuró la investigación institucional y técnica sobre el **Catastro Multipropósito de Montería (Gestor Catastral)**, la cartografía básica 1:1.000 del IGAC en Colombia en Mapas y la ruta de vinculación de los predios (NPN) con las huellas de Colouring Montería.
 - **Validación:** La auditoría espacial final arrojó `0` solapes residuales; el servidor Razzle sirvió los 51.419 polígonos en `http://localhost:8080/geometries/monteria_centro.geojson` con respuesta HTTP 200 OK y cero advertencias de base de datos.
 - **Pendientes o incidencias:** Ninguno.
+
+### 2026-10-23 18:41 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Antigravity (Google DeepMind).
+- **Solicitud:** Descargar y procesar la cartografía básica oficial 1:1.000 de Montería desde Colombia en Mapas (/browser).
+- **Trabajo realizado:**
+  1. Se utilizó el subagente de navegación web (browser) para interactuar con la plataforma oficial de Colombia en Mapas (colombiaenmapas.gov.co), localizando el producto oficial de la Alcaldía de Montería (Servicio 10642: Base de datos vectorial básica. Cabecera Municipal de Montería. Escala 1:1.000. Año 2023/2024).
+  2. Se extrajeron los enlaces de geoservicios OGC (WMS, WFS y REST) y los tokens firmados de descarga para formatos Shapefile, GDB y Geopackage.
+  3. Se procesó y descomprimió el paquete oficial en insumos/Carto1000_Monteria/ (216 archivos con capas de edificaciones, vías, zonas duras, drenajes, curvas de nivel y equipamientos).
+  4. Se analizó la capa oficial de huellas de edificaciones Constr_R.shp (EPSG:9377 / CTM12), confirmando **22.362 construcciones oficiales**.
+  5. Se desarrolló un script en Python (pyproj + shapely) para reproyectar las 22.362 construcciones a WGS84 (EPSG:4326), exportándolas a configuration/alcaldia_monteria_construcciones_1000.geojson.
+  6. Se sincronizaron todos los insumos y capas en el repositorio local y en Google Drive (G:\Mi unidad\colouring-monteria\insumos\).
+- **Validación:** Se validó la extracción completa del .zip (79.03 MB); la conversión a GeoJSON generó 22.362 features válidas con atributos CIdentif, CTipo, CDescrip, SHAPE_Area y SHAPE_Leng.
+- **Pendientes o incidencias:** Ninguno. Insumo listo para contraste o fusión con la capa de Colouring Montería.
