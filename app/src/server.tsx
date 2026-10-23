@@ -24,18 +24,18 @@ server.use(express.static(process.env.RAZZLE_PUBLIC_DIR));
 
 // handle user sessions
 let sessionStore: any = undefined;
-try {
-    const pgSession = pgConnect(session);
-    sessionStore = new pgSession({
-        pgPromise: db,
-        tableName: 'user_sessions',
-        pruneSessionInterval: false,
-        errorLog: (err: any) => {
-            // Ignorar avisos periódicos de conexión en desarrollo
-        }
-    });
-} catch (e) {
-    // Fallback a memoria
+if (process.env.NODE_ENV === 'production') {
+    try {
+        const pgSession = pgConnect(session);
+        sessionStore = new pgSession({
+            pgPromise: db,
+            tableName: 'user_sessions',
+            pruneSessionInterval: false,
+            errorLog: (err: any) => {}
+        });
+    } catch (e) {
+        // Fallback a memoria
+    }
 }
 
 const sess: any = { // TODO: remove any
