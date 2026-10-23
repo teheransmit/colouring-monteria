@@ -174,3 +174,19 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
 - **Pendientes o incidencias:** Los 36.206 polígonos ya están publicados en el
   repositorio, pero todavía falta importarlos a PostgreSQL/PostGIS para que
   formen parte de la base de datos de la aplicación.
+
+### 2026-10-23 17:03 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Copilot usando Copilot SDK en VS Code.
+- **Solicitud:** Revisar si el README de GitHub está correcto y actualizarlo
+  cuando sea necesario.
+- **Trabajo realizado:** Se actualizó `README.md` para corregir el comando de
+  inicio (`npm start`), cerrar correctamente los bloques de código, documentar
+  los scripts disponibles, agregar el uso opcional de Docker/PostgreSQL,
+  describir el flujo ETL y registrar la cobertura publicada de 36.206
+  polígonos OSM junto con sus limitaciones.
+- **Validación:** Se comparó la documentación con `app/package.json`,
+  `docker-compose.yml` y el GeoJSON publicado. Se conservaron fuera del cambio
+  los archivos temporales y modificaciones locales no relacionadas.
+- **Pendientes o incidencias:** La importación de polígonos a PostgreSQL/PostGIS
+  sigue siendo un paso separado y requiere que el servicio esté disponible.
