@@ -32,6 +32,7 @@ import { BuildingBaseLayer } from './layers/building-base-layer';
 import { BuildingDataLayer } from './layers/building-data-layer';
 import { BuildingNumbersLayer } from './layers/building-numbers-layer';
 import { BuildingHighlightLayer } from './layers/building-highlight-layer';
+import { MonteriaBuildingsLayer } from './layers/monteria-buildings-layer';
 import { HistoricalFootprintsLayer } from './layers/historical-footprints-layer';
 import { GreenbeltLayer } from './layers/greenbelt-layer';
 
@@ -139,6 +140,7 @@ export const ColouringMap : FC<ColouringMapProps> = ({
                     style={{zIndex: 195}}
                 >
                     <BuildingBaseLayer theme={darkLightTheme} />
+                    <MonteriaBuildingsLayer />
                 </Pane>
 
                 {
