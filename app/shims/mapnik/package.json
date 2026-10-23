@@ -1,0 +1,7 @@
+{
+  "name": "@mapnik/mapnik",
+  "version": "4.7.2",
+  "description": "Windows development shim for Mapnik using Sharp",
+  "main": "index.js",
+  "types": "index.d.ts"
+}
