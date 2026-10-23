@@ -1,4 +1,4 @@
-﻿# Bitácora de trabajo con IA
+# Bitácora de trabajo con IA
 
 Este archivo registra las actividades realizadas por asistentes de inteligencia
 artificial en el proyecto **Colouring Montería**.
@@ -215,3 +215,17 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
   6. Se actualizó la capa pública web (pp/public/geometries/monteria_centro.geojson) y se regeneró configuration/generate_footprints.sql (16,4 MB) para PostGIS.
 - **Validación:** El script finalizó con código 0; el endpoint /geometries/monteria_centro.geojson respondió HTTP 200; generate_footprints.sql creció a 16.391.250 bytes con todas las sentencias ST_Transform y ST_GeomFromGeoJSON.
 - **Pendientes o incidencias:** Ninguno en el visor web ni en QGIS; la base de datos PostgreSQL permanece como paso de carga diferido.
+
+### 2026-10-23 18:31 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Antigravity (Google DeepMind).
+- **Solicitud:** Corregir polígonos superpuestos en Montería e investigar la disponibilidad de predios oficiales de la Alcaldía de Montería e IGAC (/plan /goal /teamwork-preview /browser /boost).
+- **Trabajo realizado:**
+  1. Se desarrolló y ejecutó el algoritmo `configuration/clean_overlapping_footprints.py` con `shapely.strtree.STRtree` para depuración topológica exacta.
+  2. Se eliminaron 1.252 huellas satelitales de Microsoft que colisionaban con construcciones verificadas de OpenStreetMap y se deduplicaron 69 clones internos de OSM.
+  3. Se resolvieron 3.256 pares de polígonos superpuestos iniciales, alcanzando **0 pares con solape residual (>5% de área)**.
+  4. Se consolidó el dataset definitivo con **51.419 edificaciones limpias**, garantizando cobertura >90% sin polígonos montados.
+  5. Se regeneró `configuration/generate_footprints.sql` (15,9 MB) y se actualizaron tanto `monteria_completa.geojson` como `app/public/geometries/monteria_centro.geojson` en el SSD local y en el espejo de Google Drive.
+  6. Se estructuró la investigación institucional y técnica sobre el **Catastro Multipropósito de Montería (Gestor Catastral)**, la cartografía básica 1:1.000 del IGAC en Colombia en Mapas y la ruta de vinculación de los predios (NPN) con las huellas de Colouring Montería.
+- **Validación:** La auditoría espacial final arrojó `0` solapes residuales; el servidor Razzle sirvió los 51.419 polígonos en `http://localhost:8080/geometries/monteria_centro.geojson` con respuesta HTTP 200 OK y cero advertencias de base de datos.
+- **Pendientes o incidencias:** Ninguno.
