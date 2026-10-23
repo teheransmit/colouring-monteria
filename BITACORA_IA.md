@@ -243,3 +243,17 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
   6. Se sincronizaron todos los insumos y capas en el repositorio local y en Google Drive (G:\Mi unidad\colouring-monteria\insumos\).
 - **Validación:** Se validó la extracción completa del .zip (79.03 MB); la conversión a GeoJSON generó 22.362 features válidas con atributos CIdentif, CTipo, CDescrip, SHAPE_Area y SHAPE_Leng.
 - **Pendientes o incidencias:** Ninguno. Insumo listo para contraste o fusión con la capa de Colouring Montería.
+
+### 2026-10-23 18:52 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Antigravity (Google DeepMind).
+- **Solicitud:** Revisar el archivo QGIS_Colouring_Monteria.qgz, depurar capas saturadas y conservar las capas esenciales para el proyecto mediante qgis-mcp.
+- **Trabajo realizado:**
+  1. Se estableció conexión en tiempo real con la instancia activa de QGIS (PID 15220) a través del protocolo qgis-mcp (puerto 9876).
+  2. Se auditaron las 30 capas cargadas en el proyecto QGIS_Colouring_Monteria.qgz.
+  3. Se eliminaron 16 capas accesorias que saturaban el rendimiento gráfico y la vista (TSPubl con miles de tapas de alcantarilla, RATens de alta tensión, Tuberi, SVial, Muro, Cerca, LDemar, LVia, PDistr, Pozo, etc.).
+  4. Se mantuvieron las 14 capas estructurales clave: Constr_R (construcciones oficiales Alcaldía 1:1.000), Drenaj_R y Drenaj_L (Río Sinú y canales pluviales), Puente_L (puentes sobre el río), Via (red vial), Ciclor (ciclorrutas), ZVerde y ZDura (espacio público), Bosque y Google Hybrid.
+  5. Se insertó la capa maestra limpia configuration/monteria_completa.geojson (51.419 huellas sin solapes).
+  6. Se guardaron los cambios directamente en QGIS_Colouring_Monteria.qgz y se sincronizó en el espejo de Google Drive.
+- **Validación:** El servidor qgis-mcp ejecutó la eliminación de capas, la adición del vector maestro y save_project con código 0; la consulta final arrojó 15 capas optimizadas y activas.
+- **Pendientes o incidencias:** Ninguno.
