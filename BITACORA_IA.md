@@ -157,3 +157,20 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
   no necesarios.
 - **Pendientes o incidencias:** La base de datos PostgreSQL todavía requiere
   una importación separada cuando el servicio esté disponible.
+
+### 2026-10-23 16:58 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Copilot usando Copilot SDK en VS Code.
+- **Solicitud:** Publicar los cambios autorizados directamente en el repositorio
+  de GitHub.
+- **Trabajo realizado:** Se publicó el commit `403105ab`
+  (`feat: publish expanded Monteria building coverage`) en la rama
+  `development-workshop` de
+  `teheransmit/colouring-monteria`. El commit contiene el GeoJSON ampliado y
+  esta bitácora.
+- **Validación:** GitHub confirmó el archivo remoto con 11.515.159 bytes y la
+  rama local y remota quedaron alineadas. Los archivos temporales, datos
+  auxiliares y cambios locales no relacionados permanecen fuera del commit.
+- **Pendientes o incidencias:** Los 36.206 polígonos ya están publicados en el
+  repositorio, pero todavía falta importarlos a PostgreSQL/PostGIS para que
+  formen parte de la base de datos de la aplicación.
