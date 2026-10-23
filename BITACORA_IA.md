@@ -201,3 +201,17 @@ una nueva entrada al final de este archivo. La entrada debe incluir:
   3. Se reactivó el servidor de desarrollo local en http://localhost:8080 (tras haberse detenido por reinicio de tareas de fondo), confirmando la compilación exitosa del cliente (7.57s) y servidor (2.22s).
 - **Validación:** Invoke-WebRequest http://localhost:8080 respondió 200 OK. Se confirmó que la aplicación sirve fluidamente los 36.206 polígonos OSM y mantiene activo el bypass de autenticación y persistencia local para edición.
 - **Pendientes o incidencias:** La base de datos PostgreSQL sigue pendiente de arranque e importación formal (los polígonos se sirven actualmente vía capa GeoJSON pública).
+
+### 2026-10-23 18:21 (America/Bogota, UTC-05:00)
+
+- **Asistente:** Antigravity (Google DeepMind).
+- **Solicitud:** Generar y fusionar los polígonos faltantes de Montería para alcanzar cobertura urbana total (/plan /teamwork-preview /boost).
+- **Trabajo realizado:**
+  1. Se creó y ejecutó el algoritmo configuration/merge_missing_footprints.py con indexación espacial por cuadrícula y umbral de deduplicación de 10 metros.
+  2. Se procesaron 25.357 huellas satelitales de Microsoft Building Footprints (ms_032230122.csv.gz).
+  3. Se eliminaron 8.670 duplicados geométricos contra la capa base de OpenStreetMap y se filtraron 141 artefactos menores a 18 m².
+  4. Se incorporaron **16.546 nuevas edificaciones faltantes** en zonas de expansión, margen izquierda y barrios periféricos (Cantaclaro, Furatena, Mogambo, Garzones).
+  5. Se consolidó el dataset maestro configuration/monteria_completa.geojson con un total de **52.752 edificaciones** (>90% de cobertura urbana).
+  6. Se actualizó la capa pública web (pp/public/geometries/monteria_centro.geojson) y se regeneró configuration/generate_footprints.sql (16,4 MB) para PostGIS.
+- **Validación:** El script finalizó con código 0; el endpoint /geometries/monteria_centro.geojson respondió HTTP 200; generate_footprints.sql creció a 16.391.250 bytes con todas las sentencias ST_Transform y ST_GeomFromGeoJSON.
+- **Pendientes o incidencias:** Ninguno en el visor web ni en QGIS; la base de datos PostgreSQL permanece como paso de carga diferido.

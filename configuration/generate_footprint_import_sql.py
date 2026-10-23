@@ -4,7 +4,7 @@ import json
 import os
 
 INPUT_DIRECTORY = "C:/Users/Luis/colouring-monteria/configuration/"
-INPUT_FILENAME = "monteria_buildings.geojson"
+INPUT_FILENAME = "monteria_completa.geojson"
 OUTPUT_FILENAME = "C:/Users/Luis/colouring-monteria/configuration/generate_footprints.sql"
 
 OUTPUT = []
@@ -29,7 +29,7 @@ def location_code():
     return "mon"
 
 def fake_toid_prefix():
-    return 'mon_osm_'
+    return 'mon_bld_'
 
 def files_loaded():
     return [
@@ -39,7 +39,7 @@ def files_loaded():
 def load_into_table(table, geojson_file):
     global IDENTIFIER_COUNTER
 
-    with open(geojson_file, 'r', encoding="utf8") as content_file:
+    with open(geojson_file, 'r', encoding="utf-8-sig") as content_file:
         content = content_file.read()
         data = json.loads(content)
         insert_prefix = "INSERT INTO " + table + "(source_id, geometry_geom) VALUES"
@@ -83,7 +83,6 @@ def load_into_table(table, geojson_file):
         if len(values) > 0:
             OUTPUT.append(" " + ", ".join(values) + ";\n")
         else:
-            # Eliminar último insert_prefix si quedó vacío
             if OUTPUT[-1] == insert_prefix:
                 OUTPUT.pop()
 
