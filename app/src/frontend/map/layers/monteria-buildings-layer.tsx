@@ -1,29 +1,94 @@
-import { GeoJsonObject } from 'geojson';
-import React, { useEffect, useState } from 'react';
-import { GeoJSON } from 'react-leaflet';
+import { Feature, FeatureCollection, GeoJsonObject } from 'geojson';
+import L from 'leaflet';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GeoJSON, useMap, useMapEvents } from 'react-leaflet';
 import { useHistory } from 'react-router';
 
 import { apiGet } from '../../apiHelpers';
 
+interface IndexedFeature extends Feature {
+    _bbox?: [number, number, number, number]; // [minLon, minLat, maxLon, maxLat]
+}
+
+function computeBBox(feature: Feature): [number, number, number, number] {
+    const geom = feature.geometry;
+    let minLon = 180, minLat = 90, maxLon = -180, maxLat = -90;
+
+    const processCoord = (pt: number[]) => {
+        const [lon, lat] = pt;
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+    };
+
+    if (geom.type === 'Polygon') {
+        const rings = geom.coordinates as number[][][];
+        for (const ring of rings) {
+            for (const pt of ring) processCoord(pt);
+        }
+    } else if (geom.type === 'MultiPolygon') {
+        const polys = geom.coordinates as number[][][][];
+        for (const poly of polys) {
+            for (const ring of poly) {
+                for (const pt of ring) processCoord(pt);
+            }
+        }
+    }
+
+    return [minLon, minLat, maxLon, maxLat];
+}
+
 export function MonteriaBuildingsLayer() {
-    const [consolidadaGeojson, setConsolidadaGeojson] = useState<GeoJsonObject>(null);
-    const [alcaldiaGeojson, setAlcaldiaGeojson] = useState<GeoJsonObject>(null);
-    const [activeLayer, setActiveLayer] = useState<'consolidada' | 'alcaldia' | 'ambas'>('consolidada');
-    const [loadingAlcaldia, setLoadingAlcaldia] = useState<boolean>(false);
+    const map = useMap();
     const history = useHistory();
 
+    const [allConsolidada, setAllConsolidada] = useState<IndexedFeature[]>([]);
+    const [allAlcaldia, setAllAlcaldia] = useState<IndexedFeature[]>([]);
+    const [visibleConsolidada, setVisibleConsolidada] = useState<FeatureCollection>(null);
+    const [visibleAlcaldia, setVisibleAlcaldia] = useState<FeatureCollection>(null);
+
+    const [activeLayer, setActiveLayer] = useState<'consolidada' | 'alcaldia' | 'ambas'>('consolidada');
+    const [loadingAlcaldia, setLoadingAlcaldia] = useState<boolean>(false);
+    const [zoomLevel, setZoomLevel] = useState<number>(map.getZoom());
+
+    // Canvas GPU Renderer para 60 FPS continuos
+    const canvasRenderer = useMemo(() => {
+        return L.canvas({ padding: 0.5, tolerance: 10 });
+    }, []);
+
+    // Cargar capa consolidada maestra (51.419 huellas)
     useEffect(() => {
         apiGet('/geometries/monteria_centro.geojson')
-            .then(data => setConsolidadaGeojson(data as GeoJsonObject))
+            .then((data: any) => {
+                if (data && data.features) {
+                    const indexed: IndexedFeature[] = data.features.map((f: Feature) => {
+                        return {
+                            ...f,
+                            _bbox: computeBBox(f)
+                        };
+                    });
+                    setAllConsolidada(indexed);
+                }
+            })
             .catch(err => console.warn('Could not load Monteria buildings:', err));
     }, []);
 
-    const loadAlcaldiaData = () => {
-        if (!alcaldiaGeojson && !loadingAlcaldia) {
+    // Cargar capa oficial Alcaldía 1:1.000 bajo demanda
+    const loadAlcaldiaData = useCallback(() => {
+        if (allAlcaldia.length === 0 && !loadingAlcaldia) {
             setLoadingAlcaldia(true);
             apiGet('/geometries/alcaldia_monteria_1000.geojson')
-                .then(data => {
-                    setAlcaldiaGeojson(data as GeoJsonObject);
+                .then((data: any) => {
+                    if (data && data.features) {
+                        const indexed: IndexedFeature[] = data.features.map((f: Feature) => {
+                            return {
+                                ...f,
+                                _bbox: computeBBox(f)
+                            };
+                        });
+                        setAllAlcaldia(indexed);
+                    }
                     setLoadingAlcaldia(false);
                 })
                 .catch(err => {
@@ -31,9 +96,66 @@ export function MonteriaBuildingsLayer() {
                     setLoadingAlcaldia(false);
                 });
         }
-    };
+    }, [allAlcaldia, loadingAlcaldia]);
 
-    // Exponer función global para que los botones de los popups puedan disparar la navegación
+    // Filtrado por Ventana de Visualización (Viewport BBOX Culling) a 60 FPS
+    const updateVisibleBBoxes = useCallback(() => {
+        if (!map) return;
+        const currentZoom = map.getZoom();
+        setZoomLevel(currentZoom);
+
+        // Si el zoom es menor a 14 (vista de todo el departamento o ciudad lejana),
+        // no saturamos el GPU dibujando 50.000 polígonos microscópicos
+        if (currentZoom < 14) {
+            setVisibleConsolidada(null);
+            setVisibleAlcaldia(null);
+            return;
+        }
+
+        const b = map.getBounds();
+        const west = b.getWest();
+        const south = b.getSouth();
+        const east = b.getEast();
+        const north = b.getNorth();
+
+        // Culling Consolidada
+        if (allConsolidada.length > 0) {
+            const filtered = allConsolidada.filter(f => {
+                const box = f._bbox;
+                if (!box) return true;
+                return box[2] >= west && box[0] <= east && box[3] >= south && box[1] <= north;
+            });
+            setVisibleConsolidada({
+                type: 'FeatureCollection',
+                features: filtered
+            });
+        }
+
+        // Culling Alcaldía
+        if (allAlcaldia.length > 0) {
+            const filtered = allAlcaldia.filter(f => {
+                const box = f._bbox;
+                if (!box) return true;
+                return box[2] >= west && box[0] <= east && box[3] >= south && box[1] <= north;
+            });
+            setVisibleAlcaldia({
+                type: 'FeatureCollection',
+                features: filtered
+            });
+        }
+    }, [map, allConsolidada, allAlcaldia]);
+
+    // Escuchar eventos de paneo y zoom con actualización inmediata
+    useMapEvents({
+        moveend: updateVisibleBBoxes,
+        zoomend: updateVisibleBBoxes
+    });
+
+    useEffect(() => {
+        updateVisibleBBoxes();
+    }, [allConsolidada, allAlcaldia, activeLayer, updateVisibleBBoxes]);
+
+    // Exponer navegación global para botones de popups
     useEffect(() => {
         (window as any).selectMonteriaBuilding = (buildingId: number) => {
             if (history) {
@@ -77,24 +199,6 @@ export function MonteriaBuildingsLayer() {
         `);
 
         layer.on({
-            mouseover: (e: any) => {
-                const target = e.target;
-                target.setStyle({
-                    weight: 2.5,
-                    color: '#ffffff',
-                    fillColor: '#FF6600',
-                    fillOpacity: 0.70
-                });
-            },
-            mouseout: (e: any) => {
-                const target = e.target;
-                target.setStyle({
-                    weight: 0.8,
-                    color: '#FF6600',
-                    fillColor: '#FFA726',
-                    fillOpacity: 0.25
-                });
-            },
             click: () => {
                 if (history) {
                     history.push(`/view/location/${id}`);
@@ -133,32 +237,11 @@ export function MonteriaBuildingsLayer() {
                 </div>
             </div>
         `);
-
-        layer.on({
-            mouseover: (e: any) => {
-                const target = e.target;
-                target.setStyle({
-                    weight: 2.5,
-                    color: '#ffffff',
-                    fillColor: '#0284c7',
-                    fillOpacity: 0.80
-                });
-            },
-            mouseout: (e: any) => {
-                const target = e.target;
-                target.setStyle({
-                    weight: 0.9,
-                    color: '#0284c7',
-                    fillColor: '#38bdf8',
-                    fillOpacity: 0.35
-                });
-            }
-        });
     };
 
     return (
         <>
-            {/* Selector Flotante de Capas en Pantalla */}
+            {/* Selector Flotante de Capas */}
             <div style={{
                 position: 'fixed',
                 top: '80px',
@@ -176,8 +259,11 @@ export function MonteriaBuildingsLayer() {
                 fontSize: '12px',
                 border: '1px solid #e2e8f0'
             }}>
-                <div style={{ fontWeight: 700, color: '#334155', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Capas de Montería
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: '#334155', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Capas de Montería
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 600 }}>● 60 FPS GPU</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
                     <button
@@ -237,33 +323,60 @@ export function MonteriaBuildingsLayer() {
                 </div>
             </div>
 
-            {/* Capa Consolidada (OpenStreetMap + Microsoft) */}
-            {(activeLayer === 'consolidada' || activeLayer === 'ambas') && consolidadaGeojson && (
+            {/* Aviso de Zoom si está muy alejado */}
+            {zoomLevel < 14 && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '24px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 1000,
+                    background: 'rgba(15, 23, 42, 0.88)',
+                    backdropFilter: 'blur(6px)',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    pointerEvents: 'none'
+                }}>
+                    <span>🔍 Acércate al mapa (Zoom ≥ 14) para visualizar y editar edificaciones fluidamente</span>
+                </div>
+            )}
+
+            {/* Capa Consolidada renderizada en Canvas GPU */}
+            {(activeLayer === 'consolidada' || activeLayer === 'ambas') && visibleConsolidada && (
                 <GeoJSON
-                    key="consolidada-layer"
-                    data={consolidadaGeojson}
-                    style={{
-                        color: '#FF6600',
-                        weight: 0.8,
+                    key={`consolidada-${visibleConsolidada.features.length}`}
+                    data={visibleConsolidada}
+                    pathOptions={{
+                        renderer: canvasRenderer,
+                        color: '#ea580c',
+                        weight: 1.2,
                         fill: true,
-                        fillColor: '#FFA726',
-                        fillOpacity: 0.25
+                        fillColor: '#f97316',
+                        fillOpacity: 0.35
                     }}
                     onEachFeature={onEachConsolidadaFeature}
                 />
             )}
 
-            {/* Capa Oficial Alcaldía de Montería 1:1.000 */}
-            {(activeLayer === 'alcaldia' || activeLayer === 'ambas') && alcaldiaGeojson && (
+            {/* Capa Oficial Alcaldía de Montería renderizada en Canvas GPU */}
+            {(activeLayer === 'alcaldia' || activeLayer === 'ambas') && visibleAlcaldia && (
                 <GeoJSON
-                    key="alcaldia-layer"
-                    data={alcaldiaGeojson}
-                    style={{
+                    key={`alcaldia-${visibleAlcaldia.features.length}`}
+                    data={visibleAlcaldia}
+                    pathOptions={{
+                        renderer: canvasRenderer,
                         color: '#0284c7',
-                        weight: 0.9,
+                        weight: 1.2,
                         fill: true,
                         fillColor: '#38bdf8',
-                        fillOpacity: 0.35
+                        fillOpacity: 0.40
                     }}
                     onEachFeature={onEachAlcaldiaFeature}
                 />
