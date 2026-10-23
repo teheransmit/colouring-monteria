@@ -1,15 +1,15 @@
 ''' Generate an SQL Script to insert Colouring Cities building footprints from GEOJSON Data '''
 
 import json
+import os
 
-INPUT_DIRECTORY = "./"
-INPUT_FILENAME = "sg_building_footprint.geojson"
-
-OUTPUT_FILENAME = "generate_footprints.sql"
+INPUT_DIRECTORY = "C:/Users/Luis/colouring-monteria/configuration/"
+INPUT_FILENAME = "monteria_buildings.geojson"
+OUTPUT_FILENAME = "C:/Users/Luis/colouring-monteria/configuration/generate_footprints.sql"
 
 OUTPUT = []
 
-print(f"Saving to file: '{OUTPUT_FILENAME}' ... ", end='')
+print(f"Generando script SQL en: '{OUTPUT_FILENAME}' ... ")
 
 OUTPUT.append("DROP TABLE IF EXISTS new_geometries;\n")
 OUTPUT.append("""CREATE TABLE IF NOT EXISTS new_geometries (
@@ -20,36 +20,23 @@ OUTPUT.append("""CREATE TABLE IF NOT EXISTS new_geometries (
 IDENTIFIER_COUNTER = 1
 
 def file_location():
-    ''' Docstring '''
     return INPUT_DIRECTORY
 
 def file_location_name():
-    ''' Docstring '''
     return INPUT_FILENAME
 
 def location_code():
-    ''' Docstring '''
-    # things like "inspire+localmap_intersect5201"
-    # lc - leicester
-    # nc - Newcastle
-    # lbx - area_around_loughborough
-    #return "lbx"
-    return "sgp"
-
-# end of configuration
+    return "mon"
 
 def fake_toid_prefix():
-    ''' Docstring '''
-    return 'inspire+local_ntrsc_' + location_code()
+    return 'mon_osm_'
 
 def files_loaded():
-    ''' Docstring '''
     return [
-        file_location() + file_location_name()
+        os.path.join(file_location(), file_location_name())
     ]
 
 def load_into_table(table, geojson_file):
-    ''' Docstring '''
     global IDENTIFIER_COUNTER
 
     with open(geojson_file, 'r', encoding="utf8") as content_file:
@@ -57,7 +44,7 @@ def load_into_table(table, geojson_file):
         data = json.loads(content)
         insert_prefix = "INSERT INTO " + table + "(source_id, geometry_geom) VALUES"
 
-        OUTPUT.append(insert_prefix)    #no new line!
+        OUTPUT.append(insert_prefix)
 
         values = []
 
@@ -68,53 +55,37 @@ def load_into_table(table, geojson_file):
                 for ring in entry["geometry"]["coordinates"]:
                     for coord_list in ring:
                         for coord in coord_list:
-                            lon = coord[0]
-                            lat = coord[1]
-                            if lon > 180:
-                                raise Exception("out of bounds coordinate")
-                            if lon < -180:
-                                raise Exception("out of bounds coordinate")
-                            if lat > 90:
-                                raise Exception("out of bounds coordinate")
-                            if lat <-90:
+                            lon, lat = coord[0], coord[1]
+                            if not (-180 <= lon <= 180 and -90 <= lat <= 90):
                                 raise Exception("out of bounds coordinate")
             elif geometry_type == 'Polygon':
                 for coord_list in entry["geometry"]["coordinates"]:
                     for coord in coord_list:
-                        lon = coord[0]
-                        lat = coord[1]
-                        if lon > 180:
+                        lon, lat = coord[0], coord[1]
+                        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
                             raise Exception("out of bounds coordinate")
-                        if lon < -180:
-                            raise Exception("out of bounds coordinate")
-                        if lat > 90:
-                            raise Exception("out of bounds coordinate")
-                        if lat <-90:
-                            raise Exception("out of bounds coordinate")
-            #else:
-                #print(entry["geometry"]["type"])
-                #print(entry["geometry"])
-                #print(entry)
-                #raise Exception("Unexpected type")
 
             object_id = fake_toid_prefix() + str(IDENTIFIER_COUNTER)
 
             if len(object_id) > 30:
-                print(object_id)
-                print(len(object_id))
-                raise Exception("Too long")
+                raise Exception(f"Object id too long: {object_id}")
 
             values.append("('" + object_id + "', ST_Transform(ST_GeomFromGeoJSON('" + json.dumps(entry["geometry"]) + "'), 3857))")
 
             IDENTIFIER_COUNTER += 1
-            grouping = 50_000
+            grouping = 5_000
 
-            if len(values) > grouping:
-                OUTPUT.append(", ".join(values[0:grouping]) + ";\n")
-                values = values[grouping:]
-                OUTPUT.append(insert_prefix)    #no new line
+            if len(values) >= grouping:
+                OUTPUT.append(" " + ", ".join(values) + ";\n")
+                values = []
+                OUTPUT.append(insert_prefix)
 
-        OUTPUT.append(", ".join(values) + ";\n")
+        if len(values) > 0:
+            OUTPUT.append(" " + ", ".join(values) + ";\n")
+        else:
+            # Eliminar último insert_prefix si quedó vacío
+            if OUTPUT[-1] == insert_prefix:
+                OUTPUT.pop()
 
 for file in files_loaded():
     load_into_table("new_geometries", file)
@@ -136,4 +107,4 @@ with open(OUTPUT_FILENAME, 'w', newline='', encoding="utf8") as f:
     for row in OUTPUT:
         f.write(row)
 
-print("Done!")
+print("¡SQL generado exitosamente!")
