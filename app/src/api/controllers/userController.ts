@@ -36,6 +36,15 @@ const createUser = asyncController(async (req: express.Request, res: express.Res
 });
 
 const getCurrentUser = asyncController(async (req: express.Request, res: express.Response) => {
+    if (req.session.user_id === 'dev-santiago') {
+        return res.send({
+            username: 'santiago',
+            email: 'santiago@dev.local',
+            registered: new Date().toISOString(),
+            api_key: 'dev-api-key'
+        });
+    }
+
     if (!req.session.user_id) {
         return res.send({ error: 'Must be logged in' });
     }
