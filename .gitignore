@@ -36,3 +36,12 @@ TODO
 
 # VM
 .vagrant
+
+
+# Temporary & Binary Insumos
+.tmp/
+*.zip
+*.gz
+*.7z
+*.rar
+insumos/

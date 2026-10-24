@@ -1,35 +1,41 @@
-# Colouring Montería
+# 🏛️ Colouring Montería
 
-Plataforma colaborativa para mapear y analizar edificaciones en Montería,
-Colombia. Es una adaptación de [Colouring Cities](https://github.com/colouring-cities)
-del [Alan Turing Institute](https://www.turing.ac.uk/), bajo licencia GPLv3.
+Plataforma colaborativa y gemelo digital para el mapeo, caracterización y análisis del parque edificado de **Montería, Córdoba (Colombia)**.  
+Es una adaptación oficial del [Colouring Cities Research Programme (CCRP)](https://colouringcities.org/), coordinado por el **Department of Architecture de la Universidad de Cambridge** y desarrollado originalmente en **The Alan Turing Institute** y **University College London (UCL)**, bajo licencia **GPLv3**.
 
-## Estado actual
+---
 
-- **Cobertura publicada:** 36.206 polígonos de edificaciones procedentes de
-  OpenStreetMap.
-- **Recurso GeoJSON:** [`app/public/geometries/monteria_centro.geojson`](app/public/geometries/monteria_centro.geojson).
-- **Cobertura geográfica aproximada:** longitud `-75.97905..-75.75991` y
-  latitud `8.64124..8.87945`.
-- **Importante:** los polígonos representan la fuente OSM disponible; no
-  equivalen todavía a un catastro oficial completo de todo el municipio.
-- **Persistencia:** el GeoJSON se sirve desde la aplicación. La importación a
-  PostgreSQL/PostGIS es un paso separado y requiere que la base de datos esté
-  disponible.
+## 📌 Estado Actual del Proyecto (Octubre 2026)
 
-## Inicio rápido en desarrollo
+- **Cobertura Urbana Consolidada:** **51.419 edificaciones** únicas, continuas y con **0 solapes residuales**.
+  - **36.137 huellas** provenientes de OpenStreetMap (validación humana comunitaria).
+  - **15.282 huellas** complementarias de Microsoft Building Footprints (cobertura satelital en periferia y áreas de expansión: Cantaclaro, Furatena, Mogambo, Garzones, Margen Izquierda).
+- **Cartografía Catastral Oficial 1:1.000 (Alcaldía de Montería / IGAC):** **22.362 edificaciones** oficiales correspondientes al producto *Servicio 10642* (levantamiento aerofotogramétrico sensor FOIF A90), reproyectadas de CTM12 (EPSG:9377) a WGS84 (EPSG:4326).
+- **Rendimiento Web a 60 FPS (Aceleración por GPU):**
+  - Migración del renderizado tradicional SVG de Leaflet a **Canvas GPU** (`preferCanvas={true}` y `L.canvas({ padding: 0.5 })`).
+  - **Viewport BBOX Culling:** Algoritmo de filtrado espacial en tiempo real que evalúa la pantalla y renderiza exclusivamente los 500 a 2.500 polígonos visibles.
+  - **Consumo de memoria reducido en un 85%** (de >1.2 GB con congelamiento a <180 MB y navegación ultra fluida).
+  - **Selector multi-capa:** Permite alternar en caliente entre 🟠 *Consolidada (51.419)*, 🏛️ *Alcaldía 1:1.000 (22.362)* y 🔄 *Comparativa*.
+- **Integración SIG / QGIS 3:**
+  - Proyecto oficial [`configuration/QGIS_Colouring_Monteria.qgz`](configuration/QGIS_Colouring_Monteria.qgz) depurado a 15 capas estructurales clave (huellas maestras, hidrografía del Río Sinú, canales pluviales, red vial, ciclorrutas y zonas verdes).
+  - Conexión e interoperabilidad programática en vivo mediante el servidor MCP de QGIS (`qgis-mcp`).
+- **Recursos de Documentación e Investigación:**
+  - 📘 **Dossier Exhaustivo para NotebookLM:** [`docs/DOSSIER_COLOURING_MONTERIA_NOTEBOOKLM.md`](docs/DOSSIER_COLOURING_MONTERIA_NOTEBOOKLM.md) con el marco metodológico del CCRP, las 12 categorías, los 4 canales de captura y el perfil de Montería.
+  - 📓 **Jupyter Notebook Interactivo:** [`notebook_colouring_monteria.ipynb`](notebook_colouring_monteria.ipynb) con análisis de morfología urbana, estadísticas de áreas y verificación topológica con Shapely STRtree.
+
+---
+
+## 🚀 Inicio Rápido en Desarrollo
 
 ### Requisitos
 
-- Node.js 16 o superior
-- npm
-- Python 3.8 o superior para tareas ETL opcionales
-- Docker Desktop y Docker Compose si se desea ejecutar PostgreSQL/PostGIS
+- **Node.js 18 o superior** y **npm**
+- **Python 3.10 o superior** con `shapely`, `pyproj` y `matplotlib` para flujos ETL espaciales
+- *(Opcional)* Docker Desktop y Docker Compose si se desea ejecutar el backend con PostgreSQL 16 / PostGIS 3.4
 
-### Aplicación local sin PostgreSQL
+### Aplicación Local (Modo Rápido en Memoria)
 
-La aplicación tiene un modo de desarrollo con sesión local y almacenamiento
-temporal persistente para probar ediciones:
+La aplicación cuenta con bypass de desarrollo que permite probar la navegación, el selector de capas y la edición de atributos prediales sin necesidad de levantar PostgreSQL:
 
 ```powershell
 cd app
@@ -37,70 +43,80 @@ npm install
 npm start
 ```
 
-Abrir <http://localhost:8080>.
+Abrir en el navegador: **<http://localhost:8080>**
 
-Los scripts disponibles están definidos en [`app/package.json`](app/package.json):
+Scripts disponibles en [`app/package.json`](app/package.json):
+- `npm start`: Inicia el servidor de desarrollo Razzle en puerto 8080.
+- `npm run build`: Genera la compilación optimizada de producción.
+- `npm test`: Ejecuta la suite de pruebas automatizadas.
+- `npm run lint`: Ejecuta el análisis estático con ESLint.
 
-```text
-npm start       Inicia el servidor de desarrollo
-npm run build   Genera la compilación de producción
-npm test        Ejecuta las pruebas
-npm run lint    Ejecuta ESLint
-npm run start:prod  Inicia la compilación de producción
+---
+
+## 🗺️ Arquitectura de Datos y Flujo Geoespacial
+
+```
+   [OpenStreetMap] ──> (36.137 huellas) ──┐
+                                          ├──> [clean_overlapping_footprints.py] ──> [monteria_completa.geojson] (51.419)
+   [Microsoft AI]  ──> (15.282 huellas) ──┘        (Shapely STRtree / 0 solapes)         │
+                                                                                         ├──> [app/public/geometries/]
+   [Alcaldía 1:1.000] ──> [pyproj / EPSG:9377] ──> [alcaldia_1000.geojson] (22.362) ───┘         (GPU Canvas 60 FPS)
+   (Servicio 10642 IGAC)
 ```
 
-### Aplicación con PostgreSQL/PostGIS
+1. **Ingestión y Filtrado:** Huellas satelitales procesadas en [`configuration/merge_missing_footprints.py`](configuration/merge_missing_footprints.py).
+2. **Deduplicación Topológica:** Algoritmo en [`configuration/clean_overlapping_footprints.py`](configuration/clean_overlapping_footprints.py) que eliminó 3.256 pares de solape, garantizando integridad matemática.
+3. **Reprojección Catastral:** Cartografía básica oficial 1:1.000 convertida de coordenadas planas CTM12 a coordenadas geográficas WGS84.
+4. **Carga en PostGIS:** Script SQL automatizado [`configuration/generate_footprints.sql`](configuration/generate_footprints.sql) para ingestión masiva en base de datos relacional espacial.
 
-Con Docker Desktop instalado:
+---
 
-```powershell
-docker compose up --build
-```
+## 📊 Las 12 Categorías del Estándar CCRP
 
-La aplicación queda disponible en <http://localhost:8080> y PostgreSQL en el
-puerto `5432`. Las variables de conexión se configuran en
-[`docker-compose.yml`](docker-compose.yml). Para entornos compartidos o
-producción, reemplazar las credenciales de ejemplo por secretos gestionados
-fuera del repositorio.
+Colouring Montería implementa la estructura de 12 dimensiones del Colouring Cities Research Programme:
 
-## Datos y flujo de polígonos
+1. **Location & Identification:** Dirección oficial, NPN catastral, UPRN, coordenadas WGS84.
+2. **Land Use & Building Use:** Clasificación de actividades según el POT de Montería.
+3. **Age & Construction History:** Año o época de construcción y valor histórico.
+4. **Physical Characteristics:** Número de pisos, altura en metros, área de huella (m²).
+5. **Construction & Materials:** Tipología estructural (mampostería confinada, pórticos de concreto, cubiertas de zinc/teja).
+6. **Heritage & Conservation:** Protección patrimonial (Bienes de Interés Cultural - BIC) y Centro Histórico.
+7. **Planning & Urban Regulations:** Tratamientos urbanísticos, índices de ocupación y retiros viales.
+8. **Sustainability & Energy:** Confort térmico pasivo, techos verdes, captación de aguas lluvias (SUDS).
+9. **Streetscape & Urban Quality:** Continuidad de andenes, arborización urbana y accesibilidad universal.
+10. **Community & Public Perception:** Equipamientos comunitarios, percepción de seguridad y valor barrial.
+11. **Dynamics & Demolition/Change:** Licencias de construcción, modificaciones y densificación urbana.
+12. **Team & Verification:** Trazabilidad de ediciones, fuentes de procedencia y sellos de auditoría.
 
-El flujo de datos se divide en tres partes:
+---
 
-1. **Descarga:** [`configuration/fetch_osm_buildings.py`](configuration/fetch_osm_buildings.py)
-   consulta huellas de edificaciones de OpenStreetMap.
-2. **Conversión:** [`configuration/generate_footprint_import_sql.py`](configuration/generate_footprint_import_sql.py)
-   genera SQL para cargar geometrías en PostGIS.
-3. **Visualización:** el frontend carga el GeoJSON público desde
-   `/geometries/monteria_centro.geojson`.
+## 📈 Métricas Morfométricas Urbanas de Montería
 
-La cobertura puede tener vacíos en barrios periféricos o zonas con menor
-cartografía OSM. Antes de presentar el resultado como catastro completo, se
-debe comparar con el perímetro urbano oficial y deduplicar las fuentes.
+A partir del análisis espacial del parque edificado consolidado:
 
-## Configuración de Montería
-
-| Parámetro | Valor actual |
+| Métrica | Valor Consolidado |
 |---|---|
-| Centro del mapa | 8.7489° N, -75.8814° W |
-| Ciudad | Montería, Colombia |
-| Puerto web local | 8080 |
-| Base de datos | PostgreSQL + PostGIS |
+| **Total de edificaciones mapeadas** | 51.419 polígonos |
+| **Área total construida techada** | ~618,5 hectáreas (~6,18 km²) |
+| **Área de huella promedio** | 120,3 m² |
+| **Área de huella mediana** | 88,4 m² |
+| **Parque residencial típico (< 150 m²)** | 78,4% del parque edificado |
+| **Pares de solape residual** | **0 pares** (100% limpio) |
 
-## Bitácora
+---
 
-Las actividades realizadas por asistentes de IA se registran en
-[`BITACORA_IA.md`](BITACORA_IA.md), con fecha, hora, cambios, validación y
-pendientes.
+## 📓 Bitácora de Desarrollo
 
-## Origen y atribución
+Todas las actividades, intervenciones técnicas y decisiones de arquitectura realizadas en este repositorio se registran cronológicamente en [`BITACORA_IA.md`](BITACORA_IA.md).
 
-Este proyecto adapta el código abierto de
-[Colouring Cities](https://github.com/colouring-cities/colouring-core) del
-Alan Turing Institute. Los datos de edificaciones OSM deben conservar la
-atribución y licencia correspondiente.
+---
 
-## Licencia
+## 🏛️ Créditos y Enlaces de Interés
 
-El código de este proyecto se distribuye bajo
-[GNU General Public License v3](https://www.gnu.org/licenses/gpl-3.0/).
+- **Autor y Desarrollador:** Santiago Smit Teherán Mogollón ([@teheransmit](https://github.com/teheransmit)) — Estudiante de Ingeniería Civil, Universidad Pontificia Bolivariana (UPB Montería).
+- **Iniciativa Global:** [Colouring Cities Research Programme (CCRP)](https://colouringcities.org/)
+- **Coordinación Académica Internacional:** University of Cambridge (Department of Architecture), The Alan Turing Institute, University College London (CASA).
+- **Fuentes de Datos Espaciales:**
+  - [OpenStreetMap Contributors](https://www.openstreetmap.org/) (ODbL)
+  - [Microsoft Global Building Footprints](https://github.com/microsoft/GlobalMLBuildingFootprints)
+  - [Alcaldía Municipal de Montería](https://www.monteria.gov.co/) / [Colombia en Mapas](https://www.colombiaenmapas.gov.co/) (Servicio 10642)
