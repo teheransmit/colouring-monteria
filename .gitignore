@@ -45,3 +45,6 @@ TODO
 *.7z
 *.rar
 insumos/
+
+# Registros privados de desarrollo
+BITACORA_IA.md
