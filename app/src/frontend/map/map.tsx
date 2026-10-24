@@ -32,7 +32,7 @@ import { BuildingBaseLayer } from './layers/building-base-layer';
 import { BuildingDataLayer } from './layers/building-data-layer';
 import { BuildingNumbersLayer } from './layers/building-numbers-layer';
 import { BuildingHighlightLayer } from './layers/building-highlight-layer';
-import { MonteriaBuildingsLayer } from './layers/monteria-buildings-layer';
+import { MonteriaBuildingsLayer, MonteriaControlPanel, ThematicMode, MonteriaActiveLayer } from './layers/monteria-buildings-layer';
 import { HistoricalFootprintsLayer } from './layers/historical-footprints-layer';
 import { GreenbeltLayer } from './layers/greenbelt-layer';
 

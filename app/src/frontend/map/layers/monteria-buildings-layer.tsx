@@ -1,10 +1,13 @@
-import { Feature, FeatureCollection, GeoJsonObject } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 import L from 'leaflet';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GeoJSON, useMap, useMapEvents } from 'react-leaflet';
 import { useHistory } from 'react-router';
 
 import { apiGet } from '../../apiHelpers';
+
+export type ThematicMode = 'catastro' | 'niveles' | 'uso' | 'fuente';
+export type MonteriaActiveLayer = 'consolidada' | 'alcaldia' | 'ambas';
 
 interface IndexedFeature extends Feature {
     _bbox?: [number, number, number, number]; // [minLon, minLat, maxLon, maxLat]
@@ -39,7 +42,12 @@ function computeBBox(feature: Feature): [number, number, number, number] {
     return [minLon, minLat, maxLon, maxLat];
 }
 
-export function MonteriaBuildingsLayer() {
+interface LayerProps {
+    activeLayer?: MonteriaActiveLayer;
+    thematicMode?: ThematicMode;
+}
+
+export function MonteriaBuildingsLayer({ activeLayer = 'consolidada', thematicMode = 'catastro' }: LayerProps = {}) {
     const map = useMap();
     const history = useHistory();
 
@@ -48,16 +56,12 @@ export function MonteriaBuildingsLayer() {
     const [visibleConsolidada, setVisibleConsolidada] = useState<FeatureCollection>(null);
     const [visibleAlcaldia, setVisibleAlcaldia] = useState<FeatureCollection>(null);
 
-    const [activeLayer, setActiveLayer] = useState<'consolidada' | 'alcaldia' | 'ambas'>('consolidada');
-    const [loadingAlcaldia, setLoadingAlcaldia] = useState<boolean>(false);
-    const [zoomLevel, setZoomLevel] = useState<number>(map.getZoom());
-
     // Canvas GPU Renderer para 60 FPS continuos
     const canvasRenderer = useMemo(() => {
         return L.canvas({ padding: 0.5, tolerance: 10 });
     }, []);
 
-    // Cargar capa consolidada maestra (51.419 huellas)
+    // Cargar capa consolidada maestra (51.419 huellas con NPN y atributos)
     useEffect(() => {
         apiGet('/geometries/monteria_centro.geojson')
             .then((data: any) => {
@@ -74,10 +78,9 @@ export function MonteriaBuildingsLayer() {
             .catch(err => console.warn('Could not load Monteria buildings:', err));
     }, []);
 
-    // Cargar capa oficial Alcaldía 1:1.000 bajo demanda
-    const loadAlcaldiaData = useCallback(() => {
-        if (allAlcaldia.length === 0 && !loadingAlcaldia) {
-            setLoadingAlcaldia(true);
+    // Cargar capa oficial Alcaldía 1:1.000 si está activa
+    useEffect(() => {
+        if ((activeLayer === 'alcaldia' || activeLayer === 'ambas') && allAlcaldia.length === 0) {
             apiGet('/geometries/alcaldia_monteria_1000.geojson')
                 .then((data: any) => {
                     if (data && data.features) {
@@ -89,23 +92,16 @@ export function MonteriaBuildingsLayer() {
                         });
                         setAllAlcaldia(indexed);
                     }
-                    setLoadingAlcaldia(false);
                 })
-                .catch(err => {
-                    console.warn('Could not load Alcaldia 1:1.000 buildings:', err);
-                    setLoadingAlcaldia(false);
-                });
+                .catch(err => console.warn('Could not load Alcaldia buildings:', err));
         }
-    }, [allAlcaldia, loadingAlcaldia]);
+    }, [activeLayer, allAlcaldia]);
 
     // Filtrado por Ventana de Visualización (Viewport BBOX Culling) a 60 FPS
     const updateVisibleBBoxes = useCallback(() => {
         if (!map) return;
         const currentZoom = map.getZoom();
-        setZoomLevel(currentZoom);
 
-        // Si el zoom es menor a 14 (vista de todo el departamento o ciudad lejana),
-        // no saturamos el GPU dibujando 50.000 polígonos microscópicos
         if (currentZoom < 14) {
             setVisibleConsolidada(null);
             setVisibleAlcaldia(null);
@@ -145,7 +141,6 @@ export function MonteriaBuildingsLayer() {
         }
     }, [map, allConsolidada, allAlcaldia]);
 
-    // Escuchar eventos de paneo y zoom con actualización inmediata
     useMapEvents({
         moveend: updateVisibleBBoxes,
         zoomend: updateVisibleBBoxes
@@ -155,7 +150,6 @@ export function MonteriaBuildingsLayer() {
         updateVisibleBBoxes();
     }, [allConsolidada, allAlcaldia, activeLayer, updateVisibleBBoxes]);
 
-    // Exponer navegación global para botones de popups
     useEffect(() => {
         (window as any).selectMonteriaBuilding = (buildingId: number) => {
             if (history) {
@@ -164,28 +158,108 @@ export function MonteriaBuildingsLayer() {
         };
     }, [history]);
 
+    // Estilizado temático por atributo
+    const getBuildingStyle = useCallback((feature: any) => {
+        const props = feature?.properties || {};
+        let fillColor = '#ea580c';
+        let strokeColor = '#9a3412';
+
+        if (thematicMode === 'catastro') {
+            if (props.estado_catastro === 'Oficial Vinculado') {
+                fillColor = '#10b981'; // Verde esmeralda oficial
+                strokeColor = '#047857';
+            } else {
+                fillColor = '#f59e0b'; // Ámbar provisional
+                strokeColor = '#b45309';
+            }
+        } else if (thematicMode === 'niveles') {
+            const levels = Number(props.levels) || 1;
+            if (levels >= 8) {
+                fillColor = '#8b5cf6'; // Púrpura alta torre
+                strokeColor = '#6d28d9';
+            } else if (levels >= 4) {
+                fillColor = '#ef4444'; // Rojo mediano
+                strokeColor = '#b91c1c';
+            } else if (levels >= 2) {
+                fillColor = '#f97316'; // Naranja 2-3 pisos
+                strokeColor = '#c2410c';
+            } else {
+                fillColor = '#facc15'; // Amarillo 1 piso
+                strokeColor = '#ca8a04';
+            }
+        } else if (thematicMode === 'uso') {
+            const uso = props.land_use || 'Residencial';
+            if (uso === 'Comercial') {
+                fillColor = '#ea580c';
+                strokeColor = '#9a3412';
+            } else if (uso.includes('Educativo') || uso.includes('Institucional')) {
+                fillColor = '#0284c7';
+                strokeColor = '#0369a1';
+            } else if (uso === 'Salud') {
+                fillColor = '#dc2626';
+                strokeColor = '#991b1b';
+            } else if (uso.includes('Religioso')) {
+                fillColor = '#a855f7';
+                strokeColor = '#7e22ce';
+            } else if (uso === 'Industrial') {
+                fillColor = '#64748b';
+                strokeColor = '#334155';
+            } else {
+                fillColor = '#eab308'; // Residencial
+                strokeColor = '#a16207';
+            }
+        } else if (thematicMode === 'fuente') {
+            if (props.source === 'microsoft/ai') {
+                fillColor = '#06b6d4'; // Turquesa satelital
+                strokeColor = '#0e7490';
+            } else {
+                fillColor = '#ea580c'; // Naranja OSM
+                strokeColor = '#9a3412';
+            }
+        }
+
+        return {
+            renderer: canvasRenderer,
+            color: strokeColor,
+            weight: 1.2,
+            fill: true,
+            fillColor: fillColor,
+            fillOpacity: 0.55
+        };
+    }, [thematicMode, canvasRenderer]);
+
     const onEachConsolidadaFeature = (feature: any, layer: any) => {
         const props = feature.properties || {};
         const name = props.name || 'Edificación';
-        const type = props.building !== 'yes' ? props.building : (props.amenity || 'Residencial / Urbano');
-        const levels = props.levels ? `${props.levels} piso(s)` : '1 piso (estimado)';
+        const uso = props.land_use || 'Residencial';
+        const levels = props.levels ? `${props.levels} piso(s)` : '1 piso';
         const id = feature.id || props.osm_id || Math.floor(Math.random() * 100000);
-        const source = props.source === 'microsoft/ai' ? 'Microsoft AI Satellite' : 'OpenStreetMap Verificado';
+        const source = props.source === 'microsoft/ai' ? 'Microsoft AI Satellite' : 'OpenStreetMap';
+        const npn = props.npn || 'Sin NPN asignado';
+        const cidentif = props.codigo_catastral || 'N/A';
+        const area = props.area_catastral_m2 || props.area_m2 || 'N/D';
+        const esOficial = props.estado_catastro === 'Oficial Vinculado';
 
         layer.bindPopup(`
-            <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 210px; color: #1e293b; padding: 4px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #ea580c; padding-bottom: 4px; margin-bottom: 8px;">
-                    <span style="font-weight: 700; color: #ea580c; font-size: 13px;">${name}</span>
-                    <span style="background: #fed7aa; color: #9a3412; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;">ID: ${id}</span>
+            <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 250px; color: #1e293b; padding: 4px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid ${esOficial ? '#10b981' : '#ea580c'}; padding-bottom: 4px; margin-bottom: 8px;">
+                    <span style="font-weight: 700; color: #0f172a; font-size: 13px;">${name}</span>
+                    <span style="background: ${esOficial ? '#d1fae5' : '#fed7aa'}; color: ${esOficial ? '#065f46' : '#9a3412'}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                        ${esOficial ? '🏛️ Catastro 1:1.000' : 'Satelital / OSM'}
+                    </span>
                 </div>
-                <div style="font-size: 11px; margin-bottom: 4px;">
-                    <strong style="color: #475569;">Fuente:</strong> <span style="color: #0369a1; font-weight: 600;">${source}</span>
+                <div style="font-size: 11px; margin-bottom: 4px; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                    <strong style="color: #475569; display: block; font-size: 10px; text-transform: uppercase;">NPN (Catastro Multipropósito):</strong>
+                    <span style="font-family: monospace; font-size: 10px; color: #0f172a; font-weight: 600; word-break: break-all;">${npn}</span>
                 </div>
-                <div style="font-size: 11px; margin-bottom: 4px;">
-                    <strong style="color: #475569;">Uso del suelo:</strong> ${type}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; margin-bottom: 6px;">
+                    <div><strong style="color: #64748b;">Código:</strong> <span style="font-family: monospace;">${cidentif}</span></div>
+                    <div><strong style="color: #64748b;">Área:</strong> ${area} m²</div>
+                    <div><strong style="color: #64748b;">Uso:</strong> ${uso}</div>
+                    <div><strong style="color: #64748b;">Niveles:</strong> ${levels}</div>
                 </div>
-                <div style="font-size: 11px; margin-bottom: 8px;">
-                    <strong style="color: #475569;">Altura / Niveles:</strong> ${levels}
+                <div style="font-size: 10px; color: #64748b; margin-bottom: 8px;">
+                    <strong>Fuente:</strong> ${source}
                 </div>
                 <button 
                     onclick="window.selectMonteriaBuilding(${id})"
@@ -215,7 +289,7 @@ export function MonteriaBuildingsLayer() {
         const descrip = props.CDescrip || 'Construcción Convencional';
 
         layer.bindPopup(`
-            <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 220px; color: #0f172a; padding: 4px;">
+            <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 230px; color: #0f172a; padding: 4px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0284c7; padding-bottom: 4px; margin-bottom: 8px;">
                     <span style="font-weight: 700; color: #0284c7; font-size: 13px;">🏛️ Alcaldía de Montería</span>
                     <span style="background: #e0f2fe; color: #0369a1; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">1:1.000</span>
@@ -233,7 +307,7 @@ export function MonteriaBuildingsLayer() {
                     <strong style="color: #475569;">Perímetro:</strong> ${perimetro}
                 </div>
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; font-size: 10px; color: #64748b; text-align: center;">
-                    Fotogrametría Aérea Sensor FOIF A90 (Vigencia 2024)
+                    Cartografía Básica Oficial — Servicio 10642 IGAC
                 </div>
             </div>
         `);
@@ -241,126 +315,12 @@ export function MonteriaBuildingsLayer() {
 
     return (
         <>
-            {/* Selector Flotante de Capas */}
-            <div style={{
-                position: 'fixed',
-                top: '80px',
-                right: '20px',
-                zIndex: 1000,
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(8px)',
-                padding: '6px 10px',
-                borderRadius: '12px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontSize: '12px',
-                border: '1px solid #e2e8f0'
-            }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, color: '#334155', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Capas de Montería
-                    </span>
-                    <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 600 }}>● 60 FPS GPU</span>
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                        onClick={() => setActiveLayer('consolidada')}
-                        style={{
-                            background: activeLayer === 'consolidada' ? '#ea580c' : '#f1f5f9',
-                            color: activeLayer === 'consolidada' ? '#ffffff' : '#334155',
-                            border: 'none',
-                            padding: '5px 9px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            transition: 'all 0.15s ease'
-                        }}
-                    >
-                        🟠 Consolidada (51k)
-                    </button>
-                    <button
-                        onClick={() => {
-                            loadAlcaldiaData();
-                            setActiveLayer('alcaldia');
-                        }}
-                        style={{
-                            background: activeLayer === 'alcaldia' ? '#0284c7' : '#f1f5f9',
-                            color: activeLayer === 'alcaldia' ? '#ffffff' : '#334155',
-                            border: 'none',
-                            padding: '5px 9px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            transition: 'all 0.15s ease'
-                        }}
-                    >
-                        {loadingAlcaldia ? 'Cargando...' : '🏛️ Alcaldía 1:1.000 (22k)'}
-                    </button>
-                    <button
-                        onClick={() => {
-                            loadAlcaldiaData();
-                            setActiveLayer('ambas');
-                        }}
-                        style={{
-                            background: activeLayer === 'ambas' ? '#10b981' : '#f1f5f9',
-                            color: activeLayer === 'ambas' ? '#ffffff' : '#334155',
-                            border: 'none',
-                            padding: '5px 9px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            transition: 'all 0.15s ease'
-                        }}
-                    >
-                        🔄 Ambas
-                    </button>
-                </div>
-            </div>
-
-            {/* Aviso de Zoom si está muy alejado */}
-            {zoomLevel < 14 && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '24px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 1000,
-                    background: 'rgba(15, 23, 42, 0.88)',
-                    backdropFilter: 'blur(6px)',
-                    color: '#ffffff',
-                    padding: '8px 16px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    pointerEvents: 'none'
-                }}>
-                    <span>🔍 Acércate al mapa (Zoom ≥ 14) para visualizar y editar edificaciones fluidamente</span>
-                </div>
-            )}
-
-            {/* Capa Consolidada renderizada en Canvas GPU */}
+            {/* Capa Consolidada renderizada en Canvas GPU con Estilo Temático Dinámico */}
             {(activeLayer === 'consolidada' || activeLayer === 'ambas') && visibleConsolidada && (
                 <GeoJSON
-                    key={`consolidada-${visibleConsolidada.features.length}`}
+                    key={`consolidada-${thematicMode}-${visibleConsolidada.features.length}`}
                     data={visibleConsolidada}
-                    pathOptions={{
-                        renderer: canvasRenderer,
-                        color: '#ea580c',
-                        weight: 1.2,
-                        fill: true,
-                        fillColor: '#f97316',
-                        fillOpacity: 0.35
-                    }}
+                    style={getBuildingStyle}
                     onEachFeature={onEachConsolidadaFeature}
                 />
             )}
@@ -382,5 +342,234 @@ export function MonteriaBuildingsLayer() {
                 />
             )}
         </>
+    );
+}
+
+interface ControlPanelProps {
+    activeLayer: MonteriaActiveLayer;
+    setActiveLayer: (layer: MonteriaActiveLayer) => void;
+    thematicMode: ThematicMode;
+    setThematicMode: (mode: ThematicMode) => void;
+}
+
+export function MonteriaControlPanel({
+    activeLayer,
+    setActiveLayer,
+    thematicMode,
+    setThematicMode
+}: ControlPanelProps) {
+    return (
+        <div style={{
+            position: 'absolute',
+            top: '70px',
+            right: '16px',
+            zIndex: 1000,
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(10px)',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: '12px',
+            border: '1px solid #cbd5e1',
+            width: '280px',
+            pointerEvents: 'auto'
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '13px' }}>
+                    🏙️ COLOURING MONTERÍA
+                </span>
+                <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700, background: '#d1fae5', padding: '2px 6px', borderRadius: '4px' }}>
+                    ● 60 FPS GPU
+                </span>
+            </div>
+
+            {/* Selección de Capas Base */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Capa Base</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                        onClick={() => setActiveLayer('consolidada')}
+                        style={{
+                            flex: 1,
+                            background: activeLayer === 'consolidada' ? '#ea580c' : '#f8fafc',
+                            color: activeLayer === 'consolidada' ? '#ffffff' : '#475569',
+                            border: '1px solid #e2e8f0',
+                            padding: '6px 4px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: '10px'
+                        }}
+                    >
+                        🟠 Total (51k)
+                    </button>
+                    <button
+                        onClick={() => setActiveLayer('alcaldia')}
+                        style={{
+                            flex: 1,
+                            background: activeLayer === 'alcaldia' ? '#0284c7' : '#f8fafc',
+                            color: activeLayer === 'alcaldia' ? '#ffffff' : '#475569',
+                            border: '1px solid #e2e8f0',
+                            padding: '6px 4px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: '10px'
+                        }}
+                    >
+                        🏛️ Alcaldía (22k)
+                    </button>
+                    <button
+                        onClick={() => setActiveLayer('ambas')}
+                        style={{
+                            flex: 1,
+                            background: activeLayer === 'ambas' ? '#0f766e' : '#f8fafc',
+                            color: activeLayer === 'ambas' ? '#ffffff' : '#475569',
+                            border: '1px solid #e2e8f0',
+                            padding: '6px 4px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: '10px'
+                        }}
+                    >
+                        🔄 Ambas
+                    </button>
+                </div>
+            </div>
+
+            {/* Modos Temáticos (Pintar la Ciudad) */}
+            {activeLayer !== 'alcaldia' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Pintar Mapa Por</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                        <button
+                            onClick={() => setThematicMode('catastro')}
+                            style={{
+                                background: thematicMode === 'catastro' ? '#10b981' : '#f8fafc',
+                                color: thematicMode === 'catastro' ? '#ffffff' : '#334155',
+                                border: '1px solid #cbd5e1',
+                                padding: '6px 4px',
+                                borderRadius: '6px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: '10px'
+                            }}
+                        >
+                            🏛️ Catastro (NPN)
+                        </button>
+                        <button
+                            onClick={() => setThematicMode('niveles')}
+                            style={{
+                                background: thematicMode === 'niveles' ? '#ea580c' : '#f8fafc',
+                                color: thematicMode === 'niveles' ? '#ffffff' : '#334155',
+                                border: '1px solid #cbd5e1',
+                                padding: '6px 4px',
+                                borderRadius: '6px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: '10px'
+                            }}
+                        >
+                            🏢 Pisos / Altura
+                        </button>
+                        <button
+                            onClick={() => setThematicMode('uso')}
+                            style={{
+                                background: thematicMode === 'uso' ? '#6366f1' : '#f8fafc',
+                                color: thematicMode === 'uso' ? '#ffffff' : '#334155',
+                                border: '1px solid #cbd5e1',
+                                padding: '6px 4px',
+                                borderRadius: '6px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: '10px'
+                            }}
+                        >
+                            🏷️ Uso del Suelo
+                        </button>
+                        <button
+                            onClick={() => setThematicMode('fuente')}
+                            style={{
+                                background: thematicMode === 'fuente' ? '#0284c7' : '#f8fafc',
+                                color: thematicMode === 'fuente' ? '#ffffff' : '#334155',
+                                border: '1px solid #cbd5e1',
+                                padding: '6px 4px',
+                                borderRadius: '6px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: '10px'
+                            }}
+                        >
+                            🛰️ Fuente (OSM/AI)
+                        </button>
+                    </div>
+
+                    {/* Leyenda Dinámica */}
+                    <div style={{ marginTop: '4px', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', fontSize: '10px', border: '1px solid #e2e8f0' }}>
+                        {thematicMode === 'catastro' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#10b981', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span><strong>Oficial Vinculado:</strong> 37.000 (72%)</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#f59e0b', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span><strong>Provisional Periferia:</strong> 14.400 (28%)</span>
+                                </div>
+                            </div>
+                        )}
+                        {thematicMode === 'niveles' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#facc15', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>1 Piso</span>
+                                    <span style={{ width: '10px', height: '10px', background: '#f97316', borderRadius: '2px', display: 'inline-block', marginLeft: '6px' }}></span>
+                                    <span>2-3 Pisos</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#ef4444', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>4-7 Pisos</span>
+                                    <span style={{ width: '10px', height: '10px', background: '#8b5cf6', borderRadius: '2px', display: 'inline-block', marginLeft: '6px' }}></span>
+                                    <span>8+ Pisos</span>
+                                </div>
+                            </div>
+                        )}
+                        {thematicMode === 'uso' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#eab308', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>Residencial</span>
+                                    <span style={{ width: '10px', height: '10px', background: '#ea580c', borderRadius: '2px', display: 'inline-block', marginLeft: '6px' }}></span>
+                                    <span>Comercial</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#0284c7', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>Educación / Inst.</span>
+                                    <span style={{ width: '10px', height: '10px', background: '#dc2626', borderRadius: '2px', display: 'inline-block', marginLeft: '6px' }}></span>
+                                    <span>Salud</span>
+                                </div>
+                            </div>
+                        )}
+                        {thematicMode === 'fuente' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#ea580c', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>OpenStreetMap (36k)</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '10px', height: '10px', background: '#06b6d4', borderRadius: '2px', display: 'inline-block' }}></span>
+                                    <span>Microsoft AI (15k)</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
